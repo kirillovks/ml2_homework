@@ -1,2 +1,2 @@
-# ml2_homework
+# ML2_homework
 Лабораторная работа 4. HF tune Transformers
