@@ -3,7 +3,14 @@ import pandas as pd
 import pickle
 from utils import clean_text
 from utils import vectorize
-from transformers import AutoModelForSequenceClassification
+import torch
+from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
+
+
+model = torch.load('../models/bert_model', map_location=torch.device('cpu'))
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+device = torch.device("cpu")
+model.to(device)
 
 st.subheader("Классификатор статей")
 
@@ -26,26 +33,26 @@ def clear_text():
     st.session_state["text"] = ""
 
 def get_class(input_text, model):
-    vect_input = vectorize(pd.Series([clean_text(str(input_text))], name='text'))
-    pred = model.predict(vect_input)
+    # vect_input = vectorize(pd.Series([clean_text(str(input_text))], name='text'))
+    # pred = model.predict(vect_input)
+    text = clean_text(input_text)
+    encoding = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+    encoding = {k: v.to(model.device) for k,v in encoding.items()}
+    with torch.no_grad():
+        outputs = model(**encoding)
+    pred = torch.argmax(outputs.logits, dim=1).item()
     codes = {0: 'cs', 1: 'econ', 2: 'eess', 3: 'math', 4: 'physics', 5: 'q-bio', 6: 'q-fin', 7: 'stat'}
-    return codes[pred[0]]
+    return codes[pred]
 
 co1, co2 = st.columns([1, 1])
 with co1:
     if st.button("Проверить"):
-        model = None
         try:
-            model = pickle.load(open('../models/logreg.pkl', 'rb'))
+            ans = get_class(input2, model)
+            strin = "Научная публикация относится к категории " + ans
         except:
-            st.write('Ошибка загрузки модели')
-        if model:
-            try:
-                ans = get_class(input2, model)
-                strin = "Научная публикация относится к категории " + ans
-            except:
-                strin = "Что-то не так с публикацией"
-            st.write(strin)
+            strin = "Что-то не так с публикацией"
+        st.write(strin)
 
 with co2:
     st.button("Очистить поля", on_click=clear_text)
